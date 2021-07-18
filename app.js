@@ -10,9 +10,31 @@ const ExpressError = require('./utils/ExpressError')
 const ejsMate = require('ejs-mate');
 const session = require('express-session');
 const flash = require('connect-flash');
+const passport = require('passport');
+const localStrategy = require('passport-local');
+const User = require('./models/user');
+
 app.engine('ejs', ejsMate);
 app.set('view engine', 'ejs');
+const sessionConfig = {
+    secret: 'thisisasecret',
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        httpOnly: true,
+        expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+        maxAge: 1000 * 60 * 60 * 24 * 7
+    }
+}
 
+app.use(session(sessionConfig));
+app.use(flash());
+
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new localStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
 mongoose.connect('mongodb://localhost:27017/yelp-camp', {
     useNewUrlParser: true,
@@ -29,18 +51,8 @@ db.once('open', function () {
     console.log('We are Connected to database');
 
 });
-const sessionConfig = {
-    secret: 'thisisasecret',
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-        httpOnly: true,
-        expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
-        maxAge: 1000 * 60 * 60 * 24 * 7
-    }
-}
-app.use(session(sessionConfig));
-app.use(flash());
+
+
 
 
 app.set('views', path.join(__dirname, 'views'));
@@ -49,10 +61,14 @@ app.listen(3000, () => {
 })
 
 app.use((req, res, next) => {
+    console.log(req.session);
+    res.locals.currentUser = req.user;
     res.locals.success = req.flash('success');
     res.locals.error = req.flash('error');
     next();
 })
+
+
 app.get('/campgrounds', catchAsync(async (req, res) => {
     const campgrounds = await Campground.find({});
     res.render('index', {
@@ -62,12 +78,23 @@ app.get('/campgrounds', catchAsync(async (req, res) => {
 
 
 app.get('/campgrounds/new', (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.session.returnTo = req.originalUrl;
+        req.flash('error', 'You must be logged in');
+        return res.redirect('/login');
+
+    }
     res.render('new');
 })
 
 
 app.post('/campgrounds', catchAsync(async (req, res, next) => {
+    if (!req.isAuthenticated()) {
+        req.session.returnTo = req.originalUrl;
+        req.flash('error', 'You must be logged in');
+        return res.redirect('/login');
 
+    }
     const campground = new Campground(req.body.campground);
     await campground.save();
     req.flash('success', 'Successfully made a Campground');
@@ -78,6 +105,12 @@ app.post('/campgrounds', catchAsync(async (req, res, next) => {
 
 
 app.get('/campgrounds/:id/edit', catchAsync(async (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.session.returnTo = req.originalUrl;
+        req.flash('error', 'You must be logged in');
+        return res.redirect('/login');
+
+    }
     const campground = await Campground.findById(req.params.id);
     if (!campground) {
         req.flash('error', 'Cannot find that campground');
@@ -91,9 +124,10 @@ app.get('/campgrounds/:id/edit', catchAsync(async (req, res) => {
 
 
 app.get('/campgrounds/:id', catchAsync(async (req, res) => {
+
     const campground = await Campground.findById(req.params.id).populate('reviews');
-    //  console.log(campground);
     if (!campground) {
+        req.session.returnTo = req.originalUrl;
         req.flash('error', 'Cannot find that campground');
         return res.redirect('/campgrounds');
     }
@@ -114,6 +148,12 @@ app.put('/campgrounds/:id', catchAsync(async (req, res) => {
 
 
 app.delete('/campgrounds/:id', catchAsync(async (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.session.returnTo = req.originalUrl;
+        req.flash('error', 'You must be logged in');
+        return res.redirect('/login');
+
+    }
     await Campground.findByIdAndDelete(req.params.id);
     req.flash('success', 'Successfully deleted the campground');
     res.redirect('/campgrounds');
@@ -147,6 +187,57 @@ app.delete('/campgrounds/:id/reviews/:reviewId', catchAsync(async (req, res) => 
 }))
 
 
+app.get('/register', (req, res) => {
+    res.render('register');
+})
+app.post('/register', catchAsync(async (req, res) => {
+    try {
+        const {
+            email,
+            username,
+            password
+        } = req.body;
+        const user = new User({
+            email,
+            username
+        });
+        const registeredUser = await User.register(user, password);
+        req.login(registeredUser, err => {
+            if (err)
+                return next(err);
+            req.flash('success', 'Welcome to Yelp Camp!');
+            res.redirect('/campgrounds');
+        })
+
+    } catch (e) {
+        req.flash('error', e.message);
+        res.redirect('/register');
+
+    }
+}))
+
+app.get('/login', (req, res) => {
+    res.render('login');
+})
+
+app.post('/login', passport.authenticate('local', {
+    failureFlash: true,
+    failureRedirect: '/login'
+}), (req, res) => {
+    req.flash('success', 'welcome back!');
+    const redirectURL = req.session.returnTo || '/campgrounds';
+    delete req.session.returnTo;
+    res.redirect(redirectURL);
+})
+app.get('/logout', (req, res) => {
+    req.logout();
+    req.flash('success', 'Goodbye');
+    res.redirect('/campgrounds');
+})
+
+
+
+
 app.all('*', (req, res, next) => {
     next(new ExpressError('Page not Found', 404));
 })
@@ -157,9 +248,7 @@ app.use((err, req, res, next) => {
     } = err;
     if (!err.message)
         err.message = 'Something went wrong';
-    //message = "something went wrong";
     res.status(statusCode).render('error', {
         err
     });
-    //res.send('Something went Wrong');
 })
