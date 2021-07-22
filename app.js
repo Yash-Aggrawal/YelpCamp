@@ -76,7 +76,8 @@ app.get('/campgrounds', catchAsync(async (req, res) => {
     });
 }))
 
-
+//                                                         CAMPGROUNNDS ROUTES
+//Make a new CG Route
 app.get('/campgrounds/new', (req, res) => {
     if (!req.isAuthenticated()) {
         req.session.returnTo = req.originalUrl;
@@ -87,7 +88,7 @@ app.get('/campgrounds/new', (req, res) => {
     res.render('new');
 })
 
-
+// Post for make a new CG
 app.post('/campgrounds', catchAsync(async (req, res, next) => {
     if (!req.isAuthenticated()) {
         req.session.returnTo = req.originalUrl;
@@ -96,14 +97,13 @@ app.post('/campgrounds', catchAsync(async (req, res, next) => {
 
     }
     const campground = new Campground(req.body.campground);
+    campground.author = req.user._id;
     await campground.save();
     req.flash('success', 'Successfully made a Campground');
     res.redirect(`/campgrounds/${campground._id}`)
-
-
 }))
 
-
+//EDIT CG route
 app.get('/campgrounds/:id/edit', catchAsync(async (req, res) => {
     if (!req.isAuthenticated()) {
         req.session.returnTo = req.originalUrl;
@@ -122,10 +122,11 @@ app.get('/campgrounds/:id/edit', catchAsync(async (req, res) => {
     });
 }))
 
-
+//Show page route
 app.get('/campgrounds/:id', catchAsync(async (req, res) => {
 
-    const campground = await Campground.findById(req.params.id).populate('reviews');
+    const campground = await Campground.findById(req.params.id).populate('reviews').populate('author');
+    console.log(campground);
     if (!campground) {
         req.session.returnTo = req.originalUrl;
         req.flash('error', 'Cannot find that campground');
@@ -137,16 +138,22 @@ app.get('/campgrounds/:id', catchAsync(async (req, res) => {
 
 }))
 
-
+//UPDATE CG route
 app.put('/campgrounds/:id', catchAsync(async (req, res) => {
-    const campground = await Campground.findByIdAndUpdate(req.params.id, {
+
+    const campground = await Campground.findById(req.params.id);
+    if (!campground.author.equals(req.user._id)) {
+        req.flash('error', 'You do not permission to do that');
+        return res.redirect(`/campgrounds/${req.params.id}`);
+    }
+    const camp = await Campground.findByIdAndUpdate(req.params.id, {
         ...req.body.campground
     })
     req.flash('success', 'Successfully updated the campground');
-    res.redirect(`/campgrounds/${campground._id}`);
+    res.redirect(`/campgrounds/${camp._id}`);
 }))
 
-
+//DELETE CG route
 app.delete('/campgrounds/:id', catchAsync(async (req, res) => {
     if (!req.isAuthenticated()) {
         req.session.returnTo = req.originalUrl;
@@ -154,11 +161,19 @@ app.delete('/campgrounds/:id', catchAsync(async (req, res) => {
         return res.redirect('/login');
 
     }
+    const campground = await Campground.findById(req.params.id);
+    if (!campground.author.equals(req.user._id)) {
+        req.flash('error', 'You do not permission to do that');
+        return res.redirect(`/campgrounds/${req.params.id}`);
+    }
     await Campground.findByIdAndDelete(req.params.id);
     req.flash('success', 'Successfully deleted the campground');
     res.redirect('/campgrounds');
 }))
 
+//                                                         REVIEWS Route
+
+//CREATE a new Review
 app.post('/campgrounds/:id/reviews', catchAsync(async (req, res) => {
     const campground = await Campground.findById(req.params.id);
     const review = new Review(req.body.review);
@@ -170,6 +185,7 @@ app.post('/campgrounds/:id/reviews', catchAsync(async (req, res) => {
 
 }))
 
+//DELETED a review
 app.delete('/campgrounds/:id/reviews/:reviewId', catchAsync(async (req, res) => {
     const {
         id,
@@ -186,7 +202,7 @@ app.delete('/campgrounds/:id/reviews/:reviewId', catchAsync(async (req, res) => 
 
 }))
 
-
+//                                                 LOGIN and REGISTER route
 app.get('/register', (req, res) => {
     res.render('register');
 })
