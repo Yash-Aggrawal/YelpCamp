@@ -61,7 +61,7 @@ app.listen(3000, () => {
 })
 
 app.use((req, res, next) => {
-    console.log(req.session);
+    // console.log(req.session);
     res.locals.currentUser = req.user;
     res.locals.success = req.flash('success');
     res.locals.error = req.flash('error');
@@ -125,8 +125,13 @@ app.get('/campgrounds/:id/edit', catchAsync(async (req, res) => {
 //Show page route
 app.get('/campgrounds/:id', catchAsync(async (req, res) => {
 
-    const campground = await Campground.findById(req.params.id).populate('reviews').populate('author');
-    console.log(campground);
+    const campground = await Campground.findById(req.params.id).populate({
+        path: 'reviews',
+        populate: {
+            path: 'author'
+        }
+    }).populate('author');
+    //console.log(campground);
     if (!campground) {
         req.session.returnTo = req.originalUrl;
         req.flash('error', 'Cannot find that campground');
@@ -175,11 +180,19 @@ app.delete('/campgrounds/:id', catchAsync(async (req, res) => {
 
 //CREATE a new Review
 app.post('/campgrounds/:id/reviews', catchAsync(async (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.session.returnTo = req.originalUrl;
+        req.flash('error', 'You must be logged in');
+        return res.redirect('/login');
+
+    }
     const campground = await Campground.findById(req.params.id);
     const review = new Review(req.body.review);
+    review.author = req.user._id;
     campground.reviews.push(review);
     await review.save();
     await campground.save();
+    //console.log(review);
     req.flash('success', 'Created new review');
     res.redirect(`/campgrounds/${campground._id}`);
 
@@ -187,6 +200,13 @@ app.post('/campgrounds/:id/reviews', catchAsync(async (req, res) => {
 
 //DELETED a review
 app.delete('/campgrounds/:id/reviews/:reviewId', catchAsync(async (req, res) => {
+    if (!req.isAuthenticated()) {
+        req.session.returnTo = req.originalUrl;
+        req.flash('error', 'You must be logged in');
+        return res.redirect('/login');
+
+    }
+
     const {
         id,
         reviewId
