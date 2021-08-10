@@ -1,3 +1,7 @@
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
+
 const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
@@ -13,6 +17,13 @@ const flash = require('connect-flash');
 const passport = require('passport');
 const localStrategy = require('passport-local');
 const User = require('./models/user');
+const multer = require('multer');
+const {
+    storage
+} = require('./cloudinary');
+const upload = multer({
+    storage
+});
 
 app.engine('ejs', ejsMate);
 app.set('view engine', 'ejs');
@@ -89,16 +100,23 @@ app.get('/campgrounds/new', (req, res) => {
 })
 
 // Post for make a new CG
-app.post('/campgrounds', catchAsync(async (req, res, next) => {
+app.post('/campgrounds', upload.array('image'), catchAsync(async (req, res, next) => {
     if (!req.isAuthenticated()) {
         req.session.returnTo = req.originalUrl;
         req.flash('error', 'You must be logged in');
         return res.redirect('/login');
 
     }
+    //console.log(req.body, req.files);
+
     const campground = new Campground(req.body.campground);
+    campground.images = req.files.map(f => ({
+        url: f.path,
+        filename: f.filename
+    }));
     campground.author = req.user._id;
     await campground.save();
+    console.log(campground);
     req.flash('success', 'Successfully made a Campground');
     res.redirect(`/campgrounds/${campground._id}`)
 }))
@@ -144,7 +162,7 @@ app.get('/campgrounds/:id', catchAsync(async (req, res) => {
 }))
 
 //UPDATE CG route
-app.put('/campgrounds/:id', catchAsync(async (req, res) => {
+app.put('/campgrounds/:id', upload.array('image'), catchAsync(async (req, res) => {
 
     const campground = await Campground.findById(req.params.id);
     if (!campground.author.equals(req.user._id)) {
@@ -154,6 +172,13 @@ app.put('/campgrounds/:id', catchAsync(async (req, res) => {
     const camp = await Campground.findByIdAndUpdate(req.params.id, {
         ...req.body.campground
     })
+    const imgs = req.files.map(f => ({
+        url: f.path,
+        filename: f.filename
+    }))
+    console.log(req.body);
+    campground.images.push(...imgs);
+    await campground.save();
     req.flash('success', 'Successfully updated the campground');
     res.redirect(`/campgrounds/${camp._id}`);
 }))
