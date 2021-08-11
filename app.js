@@ -33,6 +33,7 @@ const geocoder = mbxGeocoding({
 
 
 
+
 app.engine('ejs', ejsMate);
 app.set('view engine', 'ejs');
 
@@ -80,7 +81,9 @@ db.once('open', function () {
 
 
 app.set('views', path.join(__dirname, 'views'));
-app.listen(3000, () => {
+const port=process.env.PORT || 3000;
+
+app.listen(port, () => {
     console.log('listening on port 3000');
 })
 
