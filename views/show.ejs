@@ -1,7 +1,7 @@
 <% layout('layout/boilerplate.ejs')%>
 <div class="row">
     <div class="col-6">
-        <div id='map' style='width: 400px; height: 300px;'></div>
+       
         <div id="YelpCampControls" class="carousel slide" data-bs-ride="carousel">
             <div class="carousel-inner">
                 <% campground.images.forEach((img,i)=> { %>
@@ -23,10 +23,6 @@
             <% } %>
         </div>
         <div class="card mb-3" style="width: 18rem;">
-            <!-- <% for(let img of campground.images) { %>
-            <img src="<%= img.url%>" class="card-img-top" alt="...">
-            <% } %> -->
-
             <div class="card-body">
                 <h5 class="card-title"><%= campground.title  %></h5>
                 <p class="card-text"><%= campground.description %>.</p>
@@ -46,7 +42,9 @@
             <% } %>
         </div>
     </div>
+     
     <div class="col-6">
+        <div id="map"></div>
         <% if(currentUser){ %>
         <h2>Leave a review</h2>
         <form action="/campgrounds/<%=campground._id%>/reviews" method="POST" novalidate class="mb-3 needs-validation">
@@ -111,6 +109,8 @@
         center: l1.geometry.coordinates,
         zoom: 9
     });
+     map.addControl(new mapboxgl.NavigationControl());
+
 
     var marker = new mapboxgl.Marker()
         .setLngLat(l1.geometry.coordinates)

@@ -31,9 +31,13 @@ const geocoder = mbxGeocoding({
 })
 
 
+
+
 app.engine('ejs', ejsMate);
 app.set('view engine', 'ejs');
+
 const sessionConfig = {
+    
     secret: 'thisisasecret',
     resave: false,
     saveUninitialized: true,
@@ -46,6 +50,7 @@ const sessionConfig = {
 
 app.use(session(sessionConfig));
 app.use(flash());
+app.use(express.static(__dirname + '/public'));
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -53,7 +58,9 @@ passport.use(new localStrategy(User.authenticate()));
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
-mongoose.connect('mongodb://localhost:27017/yelp-camp', {
+const dbUrl=process.env.DB_URL;
+//'mongodb://localhost:27017/yelp-camp'
+mongoose.connect(dbUrl, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     useCreateIndex: true
@@ -85,6 +92,9 @@ app.use((req, res, next) => {
     next();
 })
 
+app.get('/',(req,res)=>{
+    res.render('home');
+})
 
 app.get('/campgrounds', catchAsync(async (req, res) => {
     const campgrounds = await Campground.find({});
