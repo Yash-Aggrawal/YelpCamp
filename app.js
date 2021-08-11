@@ -24,6 +24,12 @@ const {
 const upload = multer({
     storage
 });
+const mbxGeocoding = require('@mapbox/mapbox-sdk/services/geocoding');
+const mapBoxToken = process.env.MAPBOX_TOKEN;
+const geocoder = mbxGeocoding({
+    accessToken: mapBoxToken
+})
+
 
 app.engine('ejs', ejsMate);
 app.set('view engine', 'ejs');
@@ -108,8 +114,14 @@ app.post('/campgrounds', upload.array('image'), catchAsync(async (req, res, next
 
     }
     //console.log(req.body, req.files);
+    const geoData = await geocoder.forwardGeocode({
+        query: req.body.campground.location,
+        limit: 1
+    }).send();
+    //res.send(geoData.body.features[0].geometry.coordinates);
 
     const campground = new Campground(req.body.campground);
+    campground.geometry = geoData.body.features[0].geometry;
     campground.images = req.files.map(f => ({
         url: f.path,
         filename: f.filename
@@ -176,7 +188,7 @@ app.put('/campgrounds/:id', upload.array('image'), catchAsync(async (req, res) =
         url: f.path,
         filename: f.filename
     }))
-    console.log(req.body);
+    // console.log(req.body);
     campground.images.push(...imgs);
     await campground.save();
     req.flash('success', 'Successfully updated the campground');

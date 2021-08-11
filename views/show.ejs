@@ -1,6 +1,7 @@
 <% layout('layout/boilerplate.ejs')%>
 <div class="row">
     <div class="col-6">
+        <div id='map' style='width: 400px; height: 300px;'></div>
         <div id="YelpCampControls" class="carousel slide" data-bs-ride="carousel">
             <div class="carousel-inner">
                 <% campground.images.forEach((img,i)=> { %>
@@ -100,6 +101,27 @@
 
 
 <script>
+    const l1 = <%-JSON.stringify(campground)%>
+        console.log(l1);
+
+    mapboxgl.accessToken = 'pk.eyJ1IjoieWFzaDgxOSIsImEiOiJja3M2emR3cXYwMjFmMzBsdTMxcnFkZWh5In0.lyHbVmeVIuIjb_1a3HG82w';
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: l1.geometry.coordinates,
+        zoom: 9
+    });
+
+    var marker = new mapboxgl.Marker()
+        .setLngLat(l1.geometry.coordinates)
+        .setPopup(
+            new mapboxgl.Popup({offset:25})
+            .setHTML(
+                `<h3>${l1.title}</h3><p>${l1.location}</p>`
+            )
+        )
+        .addTo(map);
+
     (function () {
         'use strict'
 
